@@ -4,6 +4,12 @@ import type { Part } from "@/lib/parts";
 export default function PartCard({ part }: { part: Part }) {
   return (
     <Link href={`/parts/${part.id}`} className="card part">
+      {part.image_path ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/images/${part.id}`} alt="" className="thumb" loading="lazy" />
+      ) : (
+        <div className="thumb placeholder">{part.file_name ? "STL" : "🔗"}</div>
+      )}
       <h3>{part.title}</h3>
       <p className="muted">
         {part.category}

@@ -1,11 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getUser } from "@/lib/auth";
-import { getPart } from "@/lib/parts";
-import StlViewer from "@/components/StlViewer";
 import { deletePart } from "@/app/actions";
-
-const formatSize = (b: number) =>
-  b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
+import ReportForm from "@/components/ReportForm";
+import StlViewer from "@/components/StlViewer";
+import { canManage, getUser } from "@/lib/auth";
+import { formatSize, vehicleLabel } from "@/lib/format";
+import { getPart } from "@/lib/parts";
 
 export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
   const { id } = await params;
@@ -13,7 +13,7 @@ export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
   if (!data) notFound();
   const { part, vehicles } = data;
   const user = await getUser();
-  const owner = user?.username === part.username;
+  const manage = canManage(user, part.user_id);
 
   return (
     <div className="stack">
@@ -26,6 +26,10 @@ export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
         </p>
       </div>
 
+      {part.image_path && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/images/${part.id}`} alt={part.title} className="photo" />
+      )}
       {part.file_name && <StlViewer url={`/files/${part.id}?view`} />}
 
       <div className="row">
@@ -52,18 +56,27 @@ export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
         {part.universal ? <p className="muted">Universal — works on any car.</p> : null}
         <ul>
           {vehicles.map((v) => (
-            <li key={v.id}>
-              {v.make} {v.model} — {v.generation} ({v.year_start}–{v.year_end})
-            </li>
+            <li key={v.id}>{vehicleLabel(v)}</li>
           ))}
         </ul>
       </div>
 
-      {owner && (
-        <form action={deletePart}>
-          <input type="hidden" name="id" value={part.id} />
-          <button className="danger">Delete this part</button>
-        </form>
+      {manage && (
+        <div className="row">
+          <Link className="btn" href={`/parts/${part.id}/edit`}>
+            Edit
+          </Link>
+          <form action={deletePart}>
+            <input type="hidden" name="id" value={part.id} />
+            <button className="danger">Delete</button>
+          </form>
+        </div>
+      )}
+      {user && !manage && <ReportForm partId={part.id} />}
+      {!user && (
+        <p className="hint">
+          <Link href="/login">Log in</Link> to report a problem with this part.
+        </p>
       )}
     </div>
   );

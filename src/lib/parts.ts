@@ -6,6 +6,8 @@ const plainOne = <T>(row: unknown): T | undefined => (row ? ({ ...(row as object
 
 export type Part = {
   id: number;
+  user_id: number;
+  image_path: string | null;
   title: string;
   description: string;
   category: string;
@@ -36,7 +38,7 @@ export type SearchParams = {
   category?: string;
 };
 
-const PART_COLS = `p.id, p.title, p.description, p.category, p.material, p.universal,
+const PART_COLS = `p.id, p.user_id, p.image_path, p.title, p.description, p.category, p.material, p.universal,
   p.file_name, p.file_size, p.source_url, p.creator_name, p.created_at, u.username`;
 
 export function listMakes(): string[] {
@@ -149,6 +151,42 @@ export function getPart(id: number): { part: Part; vehicles: (Vehicle & { note: 
       .all(id),
   );
   return { part, vehicles };
+}
+
+export type Report = { id: number; part_id: number; part_title: string | null; reporter: string; reason: string; created_at: string };
+
+export function openReports(): Report[] {
+  return plain<Report>(
+    getDb()
+      .prepare(
+        `SELECT r.id, r.part_id, p.title AS part_title, u.username AS reporter, r.reason, r.created_at
+         FROM reports r JOIN parts p ON p.id = r.part_id JOIN users u ON u.id = r.user_id
+         WHERE r.resolved = 0 ORDER BY r.id DESC`,
+      )
+      .all(),
+  );
+}
+
+export type AdminUser = { id: number; username: string; is_admin: number; created_at: string; part_count: number };
+
+export function listUsers(): AdminUser[] {
+  return plain<AdminUser>(
+    getDb()
+      .prepare(
+        `SELECT u.id, u.username, u.is_admin, u.created_at,
+           (SELECT COUNT(*) FROM parts p WHERE p.user_id = u.id) AS part_count
+         FROM users u ORDER BY u.id`,
+      )
+      .all(),
+  );
+}
+
+export function allParts(): Part[] {
+  return plain<Part>(
+    getDb()
+      .prepare(`SELECT ${PART_COLS} FROM parts p JOIN users u ON u.id = p.user_id ORDER BY p.id DESC`)
+      .all(),
+  );
 }
 
 export function recentPartsByUser(userId: number): Part[] {

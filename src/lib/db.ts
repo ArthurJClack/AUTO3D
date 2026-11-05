@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
-import { VEHICLE_SEED } from "./vehicleSeed";
+import { VEHICLE_SEED } from "./vehicleSeed.ts";
 
 export const DATA_DIR = process.env.DATA_DIR ?? path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -56,15 +56,38 @@ CREATE TABLE IF NOT EXISTS fitments (
   note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (part_id, vehicle_id)
 );
+CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY,
+  part_id INTEGER NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  resolved INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE INDEX IF NOT EXISTS idx_vehicles_make_model ON vehicles(make, model);
 CREATE INDEX IF NOT EXISTS idx_fitments_vehicle ON fitments(vehicle_id);
 `;
+
+/** Columns added after the first release; applied to databases created earlier. */
+const MIGRATIONS: [table: string, column: string, ddl: string][] = [
+  ["users", "is_admin", "INTEGER NOT NULL DEFAULT 0"],
+  ["parts", "image_path", "TEXT"],
+  ["vehicles", "source", "TEXT NOT NULL DEFAULT 'seed'"],
+];
+
+function migrate(db: DatabaseSync) {
+  for (const [table, column, ddl] of MIGRATIONS) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  }
+}
 
 function open(): DatabaseSync {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   const db = new DatabaseSync(process.env.DATABASE_PATH ?? path.join(DATA_DIR, "auto3d.db"));
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
+  migrate(db);
   const { n } = db.prepare("SELECT COUNT(*) AS n FROM vehicles").get() as { n: number };
   if (n === 0) {
     const ins = db.prepare(

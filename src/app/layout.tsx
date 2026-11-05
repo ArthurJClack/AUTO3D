@@ -21,6 +21,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <nav>
             <Link href="/search">Browse</Link>
             <Link href="/upload">Upload</Link>
+            {user && <Link href="/me">My parts</Link>}
+            {user?.isAdmin && <Link href="/admin">Admin</Link>}
             {user ? (
               <form action={logout}>
                 <span className="muted">{user.username}</span>

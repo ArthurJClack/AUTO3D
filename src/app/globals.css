@@ -44,3 +44,12 @@ label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--t
 .hint { font-size: .8rem; color: var(--muted); }
 .viewer-canvas { position: absolute; inset: 0; }
 .viewer-status { position: relative; z-index: 1; }
+
+.thumb { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: block; }
+.thumb.placeholder { display: flex; align-items: center; justify-content: center; font-weight: 700;
+  font-size: 1.4rem; color: var(--muted); background: var(--bg); border: 1px dashed var(--border); }
+.photo { max-width: 100%; max-height: 420px; border-radius: 12px; border: 1px solid var(--border); align-self: flex-start; }
+.danger-text { color: var(--danger) !important; }
+table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: .85rem; }
+details summary { cursor: pointer; }
