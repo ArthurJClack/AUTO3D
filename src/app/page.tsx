@@ -3,7 +3,7 @@ import VehicleSelector from "@/components/VehicleSelector";
 import { searchParts } from "@/lib/parts";
 
 export default function Home() {
-  const { fits: latest } = searchParts({});
+  const { main: latest } = searchParts({ sort: "newest" });
   return (
     <>
       <section className="hero">
@@ -19,7 +19,7 @@ export default function Home() {
         <p className="muted">Nothing here yet — be the first to upload a part.</p>
       ) : (
         <div className="grid">
-          {latest.slice(0, 12).map((p) => (
+          {latest.map((p) => (
             <PartCard key={p.id} part={p} />
           ))}
         </div>

@@ -64,6 +64,20 @@ CREATE TABLE IF NOT EXISTS reports (
   resolved INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- community "fits my car" (works=1) / "doesn't fit" (works=0), one vote per user per part+vehicle
+CREATE TABLE IF NOT EXISTS fit_votes (
+  part_id INTEGER NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+  vehicle_id INTEGER NOT NULL REFERENCES vehicles(id),
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  works INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (part_id, vehicle_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS rate_events (
+  key TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rate_events ON rate_events(key, at);
 CREATE INDEX IF NOT EXISTS idx_vehicles_make_model ON vehicles(make, model);
 CREATE INDEX IF NOT EXISTS idx_fitments_vehicle ON fitments(vehicle_id);
 `;

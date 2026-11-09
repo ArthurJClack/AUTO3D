@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deletePart } from "@/app/actions";
+import { deletePart, voteFit } from "@/app/actions";
 import ReportForm from "@/components/ReportForm";
 import StlViewer from "@/components/StlViewer";
 import { canManage, getUser } from "@/lib/auth";
 import { formatSize, vehicleLabel } from "@/lib/format";
-import { getPart } from "@/lib/parts";
+import { getFitVotes, getPart } from "@/lib/parts";
 
 export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
   const { id } = await params;
@@ -14,6 +14,8 @@ export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
   const { part, vehicles } = data;
   const user = await getUser();
   const manage = canManage(user, part.user_id);
+  const votes = getFitVotes(part.id, user?.id);
+  const canVote = !!user && user.id !== part.user_id;
 
   return (
     <div className="stack">
@@ -54,11 +56,39 @@ export default async function PartPage({ params }: PageProps<"/parts/[id]">) {
       <div className="card">
         <h3>Fits</h3>
         {part.universal ? <p className="muted">Universal — works on any car.</p> : null}
-        <ul>
-          {vehicles.map((v) => (
-            <li key={v.id}>{vehicleLabel(v)}</li>
-          ))}
+        <ul className="fits">
+          {vehicles.map((v) => {
+            const vote = votes.get(v.id);
+            const choose = (works: "1" | "0") => (vote?.mine === Number(works) ? "clear" : works);
+            return (
+              <li key={v.id} className="vote">
+                <span>{vehicleLabel(v)}</span>
+                <span className="muted">
+                  ✓ {vote?.up ?? 0} · ✗ {vote?.down ?? 0}
+                </span>
+                {canVote && (
+                  <>
+                    {(["1", "0"] as const).map((w) => (
+                      <form key={w} action={voteFit}>
+                        <input type="hidden" name="part_id" value={part.id} />
+                        <input type="hidden" name="vehicle_id" value={v.id} />
+                        <input type="hidden" name="works" value={choose(w)} />
+                        <button className={vote?.mine === Number(w) ? (w === "1" ? "on-good" : "on-bad") : ""}>
+                          {w === "1" ? "✓ Fits my car" : "✗ Doesn't fit"}
+                        </button>
+                      </form>
+                    ))}
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
+        {!user && (
+          <p className="hint" style={{ marginTop: 12 }}>
+            <Link href="/login">Log in</Link> to confirm whether it fits your car.
+          </p>
+        )}
       </div>
 
       {manage && (

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "import:vehicles": "node scripts/import-vehicles.ts",
-    "make-admin": "node scripts/make-admin.ts"
+    "make-admin": "node scripts/make-admin.ts",
+    "test": "node --test test/*.test.ts"
   },
   "dependencies": {
     "next": "^16.4.5",

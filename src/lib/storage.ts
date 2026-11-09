@@ -1,7 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import { getDb, uploadPath } from "./db";
+import { getDb, uploadPath } from "./db.ts";
 
 export const MAX_STL_BYTES = 50 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;

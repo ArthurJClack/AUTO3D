@@ -7,6 +7,7 @@ import {
   canManage,
   createSession,
   destroySession,
+  getClientIp,
   hashPassword,
   requireAdmin,
   requireUser,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/auth";
 import { CATEGORIES, MATERIALS } from "@/lib/constants";
 import { getDb } from "@/lib/db";
+import { consume, isLimited, record } from "@/lib/rateLimit";
 import {
   deleteParts,
   looksLikeStl,
@@ -37,6 +39,9 @@ export async function signup(_: FormState, fd: FormData): Promise<FormState> {
   if (!/^[A-Za-z0-9_-]{3,24}$/.test(username))
     return { error: "Username must be 3-24 characters: letters, numbers, _ or -." };
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  // Only well-formed attempts count, so a typo doesn't burn the quota.
+  if (!consume(`signup:${await getClientIp()}`, 5, 60 * 60))
+    return { error: "Too many sign-ups from this network — try again in an hour." };
   const db = getDb();
   if (db.prepare("SELECT 1 FROM users WHERE username = ?").get(username))
     return { error: "That username is taken." };
@@ -49,14 +54,25 @@ export async function signup(_: FormState, fd: FormData): Promise<FormState> {
   redirect("/");
 }
 
+// Verified against when the username doesn't exist, so response time doesn't reveal which usernames are taken.
+const DUMMY_HASH = hashPassword("not-a-real-password");
+
 export async function login(_: FormState, fd: FormData): Promise<FormState> {
   const username = str(fd, "username");
   const password = String(fd.get("password") ?? "");
+  const ipKey = `login-fail:${await getClientIp()}`;
+  const userKey = `login-fail:u:${username.toLowerCase()}`;
+  if (isLimited(ipKey, 20, 15 * 60) || isLimited(userKey, 8, 15 * 60))
+    return { error: "Too many failed attempts — try again in 15 minutes." };
   const row = getDb()
     .prepare("SELECT id, password_hash FROM users WHERE username = ?")
     .get(username) as { id: number; password_hash: string } | undefined;
-  if (!row || !verifyPassword(password, row.password_hash))
+  const valid = verifyPassword(password, row?.password_hash ?? DUMMY_HASH) && !!row;
+  if (!valid || !row) {
+    record(ipKey);
+    record(userKey);
     return { error: "Wrong username or password." };
+  }
   await createSession(row.id);
   redirect("/");
 }
@@ -209,12 +225,38 @@ export async function deletePart(fd: FormData) {
   redirect(user.isAdmin && user.id !== row.user_id ? "/admin" : "/me");
 }
 
+// ---------- fit confirmations ----------
+
+/** Cast, change or clear a "fits my car" vote for one vehicle on a part. works: "1" fits, "0" doesn't, "clear". */
+export async function voteFit(fd: FormData) {
+  const user = await requireUser();
+  const partId = Number(fd.get("part_id"));
+  const vehicleId = Number(fd.get("vehicle_id"));
+  const works = String(fd.get("works"));
+  if (!["1", "0", "clear"].includes(works)) return;
+  const db = getDb();
+  const part = db.prepare("SELECT user_id FROM parts WHERE id = ?").get(partId) as { user_id: number } | undefined;
+  if (!part || part.user_id === user.id) return; // authors can't vouch for their own part
+  if (!db.prepare("SELECT 1 FROM fitments WHERE part_id = ? AND vehicle_id = ?").get(partId, vehicleId)) return;
+  if (!consume(`vote:${user.id}`, 60, 60 * 60)) return;
+  if (works === "clear") {
+    db.prepare("DELETE FROM fit_votes WHERE part_id = ? AND vehicle_id = ? AND user_id = ?").run(partId, vehicleId, user.id);
+  } else {
+    db.prepare(
+      `INSERT INTO fit_votes (part_id, vehicle_id, user_id, works) VALUES (?,?,?,?)
+       ON CONFLICT (part_id, vehicle_id, user_id) DO UPDATE SET works = excluded.works`,
+    ).run(partId, vehicleId, user.id, Number(works));
+  }
+  revalidatePath(`/parts/${partId}`);
+}
+
 // ---------- moderation ----------
 
 export async function reportPart(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
   const partId = Number(fd.get("part_id"));
   const reason = str(fd, "reason");
+  if (!consume(`report:${user.id}`, 10, 60 * 60)) return { error: "You're sending reports too fast — try again later." };
   if (reason.length < 5 || reason.length > 500) return { error: "Please describe the problem (5-500 characters)." };
   const db = getDb();
   if (!db.prepare("SELECT 1 FROM parts WHERE id = ?").get(partId)) return { error: "That part no longer exists." };

@@ -1,8 +1,8 @@
 import "server-only";
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getDb } from "./db";
+import { getDb } from "./db.ts";
 
 const COOKIE = "session";
 const SESSION_MS = 1000 * 60 * 60 * 24 * 30;
@@ -73,3 +73,12 @@ export async function requireAdmin(): Promise<User> {
 /** Owners can manage their own parts; admins can manage anyone's. */
 export const canManage = (user: User | null, ownerId: number) =>
   !!user && (user.isAdmin || user.id === ownerId);
+
+/**
+ * Best-effort client address for rate limiting. Only trustworthy behind a proxy that sets
+ * x-forwarded-for / x-real-ip itself (Vercel, nginx, Cloudflare…); locally it falls back to "local".
+ */
+export async function getClientIp(): Promise<string> {
+  const h = await headers();
+  return h.get("x-real-ip")?.trim() || h.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+}
