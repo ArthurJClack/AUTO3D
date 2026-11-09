@@ -31,14 +31,14 @@ const vote = (partId: number, vehicleId: number, userId: number, works: 0 | 1) =
   db.prepare("INSERT INTO fit_votes (part_id, vehicle_id, user_id, works) VALUES (?,?,?,?)").run(partId, vehicleId, userId, works);
 const titles = (parts: { title: string }[]) => parts.map((p) => p.title);
 
-let ventOld: number, dashNew: number, both: number, oldTrim: number;
+let ventOld: number, dashNew: number, both: number;
 before(() => {
   owner = user("owner");
   voter1 = user("v1");
   voter2 = user("v2");
   ventOld = part("Civic vent mount", [civic10]); // older id
   dashNew = part("Civic dash clip", [civic10]);
-  oldTrim = part("Civic old trim", [civic9]);
+  part("Civic old trim", [civic9]);
   both = part("Civic dual-gen bracket", [civic9, civic10]);
   part("Universal hook", [], { universal: true });
   part("Camry mount", [camry]);
